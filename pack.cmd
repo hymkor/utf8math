@@ -1,4 +1,5 @@
 @echo off
+setlocal
 set /P "VER=Version ? "
 
 for %%I in (%CD%) do set "NAME=%%~nI"
@@ -11,3 +12,4 @@ for %%I in (linux windows.exe) do (
         zip "%NAME%-%VER%-%%~nI-%%~J.zip" "%NAME%%%~xI"
     )
 )
+endlocal
