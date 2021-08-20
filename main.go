@@ -10,46 +10,71 @@ import (
 	"unicode"
 )
 
+func alphanum(capitalStart, digitStart rune) func(rune) rune {
+	smallStart := capitalStart + 26
+	return func(c rune) rune {
+		if unicode.IsUpper(c) {
+			return capitalStart + (c - 'A')
+		} else if unicode.IsLower(c) {
+			return smallStart + (c - 'a')
+		} else if unicode.IsDigit(c) {
+			return digitStart + (c - '0')
+		} else {
+			return c
+		}
+	}
+}
+
+func alpha(capitalStart rune) func(rune) rune {
+	smallStart := capitalStart + 26
+	return func(c rune) rune {
+		if unicode.IsUpper(c) {
+			return capitalStart + (c - 'A')
+		} else if unicode.IsLower(c) {
+			return smallStart + (c - 'a')
+		} else {
+			return c
+		}
+	}
+}
+
 // unicode table
 // made from http://www.asahi-net.or.jp/~ax2s-kmtn/ref/unicode/u1d400.html
-var styles = map[string][2]rune{
-	"-bold":                   {'\U0001D400', '\U0001D7CE'},
-	"-italic":                 {'\U0001D434', '0'},
-	"-bold-italic":            {'\U0001D468', '0'},
-	"-script":                 {'\U0001D49C', '0'},
-	"-bold-script":            {'\U0001D4D0', '0'},
-	"-fraktur":                {'\U0001D504', '0'},
-	"-double-struck":          {'\U0001D538', '\U0001D7D8'},
-	"-bold-fraktur":           {'\U0001D56C', '0'},
-	"-sans-serif":             {'\U0001D5A0', '\U0001D7E2'},
-	"-sans-serif-bold":        {'\U0001D5D4', '\U0001D7EC'},
-	"-sans-serif-italic":      {'\U0001D608', '0'},
-	"-sans-serif-bold-italic": {'\U0001D63C', '0'},
-	"-monospace":              {'\U0001D670', '\U0001D7F6'},
+var styles = map[string](func(rune) rune){
+	"-bold":                   alphanum('\U0001D400', '\U0001D7CE'),
+	"-italic":                 alpha('\U0001D434'),
+	"-bold-italic":            alpha('\U0001D468'),
+	"-script":                 alpha('\U0001D49C'),
+	"-bold-script":            alpha('\U0001D4D0'),
+	"-fraktur":                alpha('\U0001D504'),
+	"-double-struck":          alphanum('\U0001D538', '\U0001D7D8'),
+	"-bold-fraktur":           alpha('\U0001D56C'),
+	"-sans-serif":             alphanum('\U0001D5A0', '\U0001D7E2'),
+	"-sans-serif-bold":        alphanum('\U0001D5D4', '\U0001D7EC'),
+	"-sans-serif-italic":      alpha('\U0001D608'),
+	"-sans-serif-bold-italic": alpha('\U0001D63C'),
+	"-monospace":              alphanum('\U0001D670', '\U0001D7F6'),
 }
+
+// https://ja.wikipedia.org/wiki/%E5%9B%B2%E3%81%BF%E6%96%87%E5%AD%97#%E3%80%8C%E2%91%A0%E3%83%BB%E2%92%B6%E3%80%8D%E7%AD%89%E3%81%AB%E3%82%88%E3%82%8B%E4%B8%80%E8%A6%A7
+var enclosedNumerics = "\u24EA\u2461\u2462\u2463\u2464\u2465\u2466\u2467\u2468\u2469"
 
 var rxAlphabet = regexp.MustCompile("[A-Za-z0-9]+")
 
-func replaceAlphabet(text string, capital, small, digit rune) string {
+func replaceAlphabet(text string, conv func(rune) rune) string {
 	return rxAlphabet.ReplaceAllStringFunc(text, func(s string) string {
 		var buffer strings.Builder
 		for _, c := range s {
-			if unicode.IsUpper(c) {
-				buffer.WriteRune(capital + (c - 'A'))
-			} else if unicode.IsLower(c) {
-				buffer.WriteRune(small + (c - 'a'))
-			} else {
-				buffer.WriteRune(digit + (c - '0'))
-			}
+			buffer.WriteRune(conv(c))
 		}
 		return buffer.String()
 	})
 }
 
-func replaceFromStdin(capital, small, digit rune) error {
+func replaceFromStdin(conv func(rune) rune) error {
 	sc := bufio.NewScanner(os.Stdin)
 	for sc.Scan() {
-		fmt.Println(replaceAlphabet(sc.Text(), capital, small, digit))
+		fmt.Println(replaceAlphabet(sc.Text(), conv))
 	}
 	if err := sc.Err(); err != io.EOF {
 		return err
@@ -62,33 +87,21 @@ func mains(args []string) error {
 		fmt.Fprintln(os.Stderr, "Convert Alphabets and digits to Mathematical Symbols")
 		fmt.Fprintf(os.Stderr, "Usage: %s {-OPTIONS TEXT}\n", os.Args[0])
 		fmt.Fprintln(os.Stderr, "(FONT-OPTIONS)")
-		for key, val := range styles {
-			fmt.Fprintf(os.Stderr, "    %s %c-%c %c-%c %c-%c\n",
-				key,
-				val[0],
-				val[0]+('Z'-'A'),
-				val[0]+('Z'-'A'+1),
-				val[0]+('Z'-'A'+1+'z'-'a'),
-				val[1],
-				val[1]+9)
+		for key, _ := range styles {
+			fmt.Fprintf(os.Stderr, "    %s\n", key)
 		}
 		fmt.Fprintln(os.Stderr, "A single hyphen(`-`) means reading text from stdin.")
 		return nil
 	}
 
-	capital := rune('A')
-	small := rune('a')
-	digit := rune('0')
-
+	conv := func(c rune) rune { return c }
 	delimiter := ""
 	for _, s := range args {
 		if len(s) > 0 && s[0] == '-' {
-			if start, ok := styles[s]; ok {
-				capital = start[0]
-				small = start[0] + ('Z' - 'A' + 1)
-				digit = start[1]
+			if _conv, ok := styles[s]; ok {
+				conv = _conv
 			} else if s == "-" {
-				if err := replaceFromStdin(capital, small, digit); err != nil {
+				if err := replaceFromStdin(conv); err != nil {
 					return err
 				}
 			} else {
@@ -96,7 +109,7 @@ func mains(args []string) error {
 			}
 		} else {
 			fmt.Print(delimiter)
-			fmt.Print(replaceAlphabet(s, capital, small, digit))
+			fmt.Print(replaceAlphabet(s, conv))
 			delimiter = " "
 		}
 	}
