@@ -38,6 +38,22 @@ func alpha(capitalStart rune) func(rune) rune {
 	}
 }
 
+// https://ja.wikipedia.org/wiki/%E5%9B%B2%E3%81%BF%E6%96%87%E5%AD%97#%E3%80%8C%E2%91%A0%E3%83%BB%E2%92%B6%E3%80%8D%E7%AD%89%E3%81%AB%E3%82%88%E3%82%8B%E4%B8%80%E8%A6%A7
+
+func enclosed(c rune) rune {
+	if unicode.IsUpper(c) {
+		return '\u24B6' + (c - 'A')
+	} else if unicode.IsLower(c) {
+		return '\u24D0' + (c - 'a')
+	} else if c == '0' {
+		return '\u24EA'
+	} else if unicode.IsDigit(c) {
+		return '\u245F' + (c - '0')
+	} else {
+		return c
+	}
+}
+
 // unicode table
 // made from http://www.asahi-net.or.jp/~ax2s-kmtn/ref/unicode/u1d400.html
 var styles = map[string](func(rune) rune){
@@ -54,10 +70,8 @@ var styles = map[string](func(rune) rune){
 	"-sans-serif-italic":      alpha('\U0001D608'),
 	"-sans-serif-bold-italic": alpha('\U0001D63C'),
 	"-monospace":              alphanum('\U0001D670', '\U0001D7F6'),
+	"-enclosed":               enclosed,
 }
-
-// https://ja.wikipedia.org/wiki/%E5%9B%B2%E3%81%BF%E6%96%87%E5%AD%97#%E3%80%8C%E2%91%A0%E3%83%BB%E2%92%B6%E3%80%8D%E7%AD%89%E3%81%AB%E3%82%88%E3%82%8B%E4%B8%80%E8%A6%A7
-var enclosedNumerics = "\u24EA\u2461\u2462\u2463\u2464\u2465\u2466\u2467\u2468\u2469"
 
 var rxAlphabet = regexp.MustCompile("[A-Za-z0-9]+")
 
